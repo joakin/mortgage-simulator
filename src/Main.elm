@@ -4,8 +4,10 @@ import Array exposing (Array)
 import Browser
 import Dict exposing (Dict)
 import Element exposing (..)
+import Element.Background as Background
 import Element.Font as Font
 import Element.Input as Input
+import Element.Lazy as Lazy
 import FormatNumber exposing (format)
 import FormatNumber.Locales exposing (spanishLocale)
 
@@ -23,6 +25,10 @@ type alias InterestRate =
 
 
 type alias Year =
+    Int
+
+
+type alias Month =
     Int
 
 
@@ -73,6 +79,7 @@ type alias ReportResults =
     { monthlyPayment : { first : Currency, rest : Currency }
     , finishesPayingIn : Years
     , totalInterests : Currency
+    , totalExpensesAndInterests : Currency
     , records : Array MonthlyRecord
     }
 
@@ -91,12 +98,13 @@ type AmortizationInProgress
 type alias ReportInProgress =
     { mortgage : MortgageInProgress
     , amortization : AmortizationInProgress
-    , results : Maybe ReportResults
     }
 
 
 type alias MonthlyRecord =
     { year : Year
+    , month : Month
+    , monthlyPayment : Currency
     , interestPayed : Currency
     , amortized : Currency
     , extraAmortization : Currency
@@ -104,9 +112,119 @@ type alias MonthlyRecord =
     }
 
 
-monthlyPayment : Currency -> InterestRate -> Years -> Currency
-monthlyPayment amount rate years =
+calculateMonthlyPayment : Currency -> InterestRate -> Years -> Currency
+calculateMonthlyPayment amount rate years =
     (amount * (rate / 12)) / (100 * (1 - (1 + (rate / 12) / 100) ^ -(years * 12)))
+
+
+isLoanPayed : Float -> Bool
+isLoanPayed amount =
+    (amount * 100 |> floor) == 0
+
+
+calculateRecords : Mortgage -> Amortization -> MonthlyRecord -> Int -> Array MonthlyRecord
+calculateRecords mortgage amortization prevRecord untilMonth =
+    let
+        rate month =
+            if month <= 12 then
+                mortgage.rate.first
+
+            else
+                mortgage.rate.rest
+
+        calculateMonth lastRecord =
+            let
+                month =
+                    lastRecord.month + 1
+
+                monthlyPayment =
+                    if month == 13 && mortgage.rate.first /= mortgage.rate.rest then
+                        calculateMonthlyPayment lastRecord.remainingLoan (rate month) (mortgage.years - 1)
+
+                    else
+                        lastRecord.monthlyPayment
+
+                interestPayed =
+                    lastRecord.remainingLoan * (rate month / 100) / 12
+
+                amortized =
+                    min (monthlyPayment - interestPayed) lastRecord.remainingLoan
+
+                loanAmountAmortized =
+                    lastRecord.remainingLoan - amortized
+
+                extraAmortization =
+                    if isLoanPayed loanAmountAmortized then
+                        0
+
+                    else if (month |> modBy 12) == 0 then
+                        min amortization.yearly loanAmountAmortized
+
+                    else
+                        0
+
+                remainingLoan =
+                    max (loanAmountAmortized - extraAmortization) 0
+            in
+            { year = ((month - 1) // 12) + 1
+            , month = month
+            , monthlyPayment = monthlyPayment
+            , interestPayed = interestPayed
+            , amortized = amortized
+            , extraAmortization = extraAmortization
+            , remainingLoan = remainingLoan
+            }
+
+        iter : MonthlyRecord -> Array MonthlyRecord -> Array MonthlyRecord
+        iter lastRecord records =
+            if isLoanPayed lastRecord.remainingLoan || lastRecord.month > untilMonth then
+                records
+
+            else
+                let
+                    record =
+                        calculateMonth lastRecord
+                in
+                iter record (Array.push record records)
+    in
+    iter prevRecord Array.empty
+
+
+calculateReportResults : Mortgage -> Amortization -> ReportResults
+calculateReportResults mortgage amortization =
+    let
+        monthlyPaymentFirstYear =
+            calculateMonthlyPayment mortgage.amount mortgage.rate.first mortgage.years
+
+        -- Base record to start generating all the monthly records. This is
+        -- a bit hacky, given it relies in knowing that calculateRecords only
+        -- uses the remainingLoan, month, and monthlyPayment from the previous
+        -- record to operate
+        baseRecord =
+            { year = 1
+            , month = 0
+            , monthlyPayment = monthlyPaymentFirstYear
+            , interestPayed = 0
+            , amortized = 0
+            , extraAmortization = 0
+            , remainingLoan = mortgage.amount
+            }
+
+        records =
+            calculateRecords mortgage amortization baseRecord (mortgage.years * 12 |> floor)
+
+        totalInterests =
+            Array.foldl (\{ interestPayed } sum -> sum + interestPayed) 0 records
+    in
+    { monthlyPayment =
+        { first = monthlyPaymentFirstYear
+        , rest = Array.get 13 records |> Maybe.map (\r -> r.monthlyPayment) |> Maybe.withDefault 0.0
+        }
+    , finishesPayingIn = (toFloat <| Array.length records) / 12
+    , totalInterests = totalInterests
+    , totalExpensesAndInterests = totalInterests + mortgage.extraExpenses
+    , records = records
+    }
 
 
 mortgageFromEditableMortgage : EditableMortgage -> Mortgage
@@ -177,7 +295,6 @@ type alias Model =
 type Page
     = Home
     | AddNewReport ReportInProgress
-    | ViewReport Report
 
 
 init : Flags -> ( Model, Cmd Msg )
@@ -190,8 +307,7 @@ init () =
 
 
 type Msg
-    = NavigateToViewExistingReport Report
-    | NavigateToNewReport
+    = NavigateToNewReport
     | NavigateToHome
     | SelectMortgage Mortgage
     | NewMortgage
@@ -200,8 +316,10 @@ type Msg
     | ResetMortgage
     | UpdateEditingAmortization EditableAmortization
     | SelectAmortization Amortization
+    | SaveReport ReportResults
 
 
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg ({ page } as model) =
     case msg of
         NavigateToHome ->
@@ -213,14 +331,10 @@ update msg ({ page } as model) =
                     AddNewReport
                         { mortgage = MortgageNotChosen
                         , amortization = AmortizationChosen { yearly = 0.0 }
-                        , results = Nothing
                         }
               }
             , Cmd.none
             )
-
-        NavigateToViewExistingReport report ->
-            ( { model | page = ViewReport report }, Cmd.none )
 
         SelectMortgage mortgage ->
             case page of
@@ -306,6 +420,25 @@ update msg ({ page } as model) =
                 _ ->
                     ( model, Cmd.none )
 
+        SaveReport results ->
+            case page of
+                AddNewReport r ->
+                    case ( r.mortgage, r.amortization ) of
+                        ( MortgageChosen m, AmortizationChosen a ) ->
+                            ( { model
+                                | page = Home
+                                , reports = { amortization = a, mortgage = m, results = results } :: model.reports
+                                , mortgages = m :: model.mortgages
+                              }
+                            , Cmd.none
+                            )
+
+                        _ ->
+                            ( model, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
 
 view model =
     { title = labels.pageTitle
@@ -340,34 +473,82 @@ menu page =
 
 
 viewPage : Model -> Element Msg
-viewPage { mortgages, page } =
+viewPage { reports, mortgages, page } =
     column [ width fill ] <|
         case page of
             Home ->
-                [ heading 1 labels.home ]
+                [ heading 1 labels.home
+                , viewHome reports
+                ]
 
             AddNewReport reportInProgress ->
                 [ heading 1 labels.newReport
                 , viewReportInProgress mortgages reportInProgress
                 ]
 
-            ViewReport report ->
-                [ heading 1 "NewReport view" ]
+
+viewHome : List Report -> Element Msg
+viewHome reports =
+    column [ padding space ] <| List.map viewReportSummary reports
+
+
+viewReportSummary report =
+    row [ width fill, spaceEvenly, spacing space ]
+        [ viewMortgageShortSummary report.mortgage
+        , viewAmortizationShortSummary report.amortization
+        , viewReportResultsShortSummary report.results
+        ]
+
+
+viewAmortizationShortSummary : Amortization -> Element Msg
+viewAmortizationShortSummary a =
+    viewSmallStackedLabels labels.amortizeEveryYear (formatCurrency a.yearly)
+
+
+viewReportResultsShortSummary : ReportResults -> Element Msg
+viewReportResultsShortSummary results =
+    row [ spacing (space * 2 // 3) ]
+        [ viewSmallStackedLabels labels.totalExpensesAndInterests (formatCurrency results.totalExpensesAndInterests)
+        , viewSmallStackedLabels labels.payedIn (labels.nYears results.finishesPayingIn)
+        , viewSmallStackedLabels labels.monthlyPaymentFirstYear (formatCurrency results.monthlyPayment.first)
+        , viewSmallStackedLabels labels.monthlyPaymentRest (formatCurrency results.monthlyPayment.rest)
+        ]
 
 
 viewReportInProgress : List Mortgage -> ReportInProgress -> Element Msg
-viewReportInProgress savedMortgages { mortgage, amortization, results } =
+viewReportInProgress savedMortgages { mortgage, amortization } =
     column [ width fill, padding space, spacing (space * 2) ]
         [ viewMortgageForm savedMortgages mortgage
         , viewAmortizationForm amortization
-        , results |> Maybe.map viewReportResults |> Maybe.withDefault none
+        , case ( mortgage, amortization ) of
+            ( MortgageChosen m, AmortizationChosen a ) ->
+                Lazy.lazy2 viewReportResultsInProgress m a
+
+            _ ->
+                none
+        ]
+
+
+viewReportResultsInProgress : Mortgage -> Amortization -> Element Msg
+viewReportResultsInProgress m a =
+    let
+        results =
+            calculateReportResults m a
+    in
+    column [ width fill, spacing space ]
+        [ row [ width fill, spacing space ]
+            [ heading 2 labels.reportResults
+            , button (SaveReport results) labels.saveReport
+            ]
+        , viewReportResults results
+        , button (SaveReport results) labels.saveReport
         ]
 
 
 viewMortgageSelector : List Mortgage -> Element Msg
 viewMortgageSelector savedMortgages =
-    row [ width fill, spaceEvenly ]
-        [ Input.radio []
+    row [ width fill, spacing space, spaceEvenly ]
+        [ Input.radio [ spacing space ]
             { onChange = SelectMortgage
             , selected = Nothing
             , label = Input.labelAbove [ paddingXY 0 space ] (label labels.selectAMortgage)
@@ -382,16 +563,12 @@ viewMortgageSelector savedMortgages =
 viewMortgageShortSummary : Mortgage -> Element Msg
 viewMortgageShortSummary m =
     row [ spacing (space * 2 // 3) ]
-        [ text m.bank
-        , viewSmallStackedLabels (formatNumber m.rate.first ++ "&")
-            (formatNumber m.rate.rest)
-        , if m.extraExpenses > 0 then
-            text (String.fromFloat m.extraExpenses)
-
-          else
-            none
-        , viewSmallStackedLabels (String.fromFloat m.years ++ " years")
-            (formatCurrency m.amount)
+        [ text [] m.bank
+        , viewSmallStackedLabels labels.loanAmount (formatCurrency m.amount)
+        , viewSmallStackedLabels labels.years (labels.nYears m.years)
+        , viewSmallStackedLabels labels.rateFirstYear (formatNumber m.rate.first ++ "&")
+        , viewSmallStackedLabels labels.rateRestOfYears (formatNumber m.rate.rest)
+        , viewSmallStackedLabels labels.extraExpenses (formatCurrency m.extraExpenses)
         ]
 
 
@@ -403,27 +580,23 @@ formatNumber n =
     format labels.numberLocale n
 
 
+formatYears n =
+    format labels.yearLocale n
+
+
 viewSmallStackedLabels top bottom =
     column [ spacing (theme.fontSize // 5) ]
-        [ el
-            [ centerX
-            , Font.size (theme.fontSize * 0.5 |> round)
-            , spacing (space // 5)
-            ]
-            (Element.text top)
-        , el
-            [ centerX
-            , Font.size (theme.fontSize * 0.75 |> round)
-            ]
+        [ el [ centerX ] (tinyLabel top)
+        , el [ centerX, Font.size (theme.fontSize * 0.75 |> round) ]
             (Element.text bottom)
         ]
 
 
+viewStackedKeyValue : String -> Element Msg -> Element Msg
 viewStackedKeyValue top bottom =
     column [ spacing (theme.fontSize // 3) ]
-        [ el [ Font.variant Font.smallCaps ]
-            (smallLabel top)
-        , el [] bottom
+        [ smallLabel top
+        , bottom
         ]
 
 
@@ -468,9 +641,9 @@ viewMortgageForm savedMortgages mortgageInProgress =
                     , el [ alignBottom ] (button ResetMortgage labels.changeMortgage)
                     ]
                 , column [ spacing (space // 2), alignTop ]
-                    [ viewStackedKeyValue labels.rateFirstYear (text <| formatNumber mortgage.rate.first)
-                    , viewStackedKeyValue labels.rateRestOfYears (text <| formatNumber mortgage.rate.rest)
-                    , viewStackedKeyValue labels.extraExpenses (text <| formatCurrency mortgage.extraExpenses)
+                    [ viewStackedKeyValue labels.rateFirstYear (text [] <| formatNumber mortgage.rate.first)
+                    , viewStackedKeyValue labels.rateRestOfYears (text [] <| formatNumber mortgage.rate.rest)
+                    , viewStackedKeyValue labels.extraExpenses (text [] <| formatCurrency mortgage.extraExpenses)
                     ]
                 , column [ spacing space, alignTop ]
                     [ viewStackedKeyValue labels.loanAmount (bigText <| formatCurrency mortgage.amount)
@@ -502,7 +675,7 @@ viewAmortizationForm amortizationInProgress =
             AmortizationChosen amortization ->
                 row [ spacing space, width fill ]
                     [ label labels.amortizeEveryYear
-                    , text <| formatCurrency amortization.yearly
+                    , text [] <| formatCurrency amortization.yearly
                     , el [ alignRight ]
                         (button
                             (UpdateEditingAmortization (amortizationToEditableAmortization amortization))
@@ -514,22 +687,89 @@ viewAmortizationForm amortizationInProgress =
 
 viewReportResults : ReportResults -> Element Msg
 viewReportResults results =
-    none
+    column [ width fill, spacing space ]
+        [ row [ width fill, spacing space, spaceEvenly ]
+            [ viewStackedKeyValue labels.totalExpensesAndInterests (bigText <| formatCurrency results.totalExpensesAndInterests)
+            , viewStackedKeyValue labels.payedIn (bigText <| labels.nYears results.finishesPayingIn)
+            , column [ spacing (space // 2) ]
+                [ viewStackedKeyValue labels.monthlyPaymentFirstYear (text [] <| formatCurrency results.monthlyPayment.first)
+                , viewStackedKeyValue labels.monthlyPaymentRest (text [] <| formatCurrency results.monthlyPayment.rest)
+                ]
+            ]
+        , table []
+            { data = results.records |> Array.toList
+            , columns = monthlyRecordColumns
+            }
+        ]
 
 
-text : String -> Element msg
-text txt =
-    el [ Font.size theme.fontSize ] (Element.text txt)
+monthlyRecordColumns : List (Column MonthlyRecord Msg)
+monthlyRecordColumns =
+    [ { header = monthlyRecordHeading labels.year
+      , width = fill
+      , view = monthlyRecordCell (\{ year } -> text [ alignRight ] <| String.fromInt year)
+      }
+    , { header = monthlyRecordHeading labels.month
+      , width = fill
+      , view = monthlyRecordCell (\{ month } -> text [ alignRight ] <| String.fromInt month)
+      }
+    , { header = monthlyRecordHeading labels.payment
+      , width = fill
+      , view = monthlyRecordCell (\{ monthlyPayment } -> text [ alignRight ] <| formatCurrency monthlyPayment)
+      }
+    , { header = monthlyRecordHeading labels.interest
+      , width = fill
+      , view = monthlyRecordCell (\{ interestPayed } -> text [ alignRight ] <| formatCurrency interestPayed)
+      }
+    , { header = monthlyRecordHeading labels.amortized
+      , width = fill
+      , view = monthlyRecordCell (\{ amortized } -> text [ alignRight ] <| formatCurrency amortized)
+      }
+    , { header = monthlyRecordHeading labels.extraAmortization
+      , width = fill
+      , view = monthlyRecordCell (\{ extraAmortization } -> text [ alignRight ] <| formatCurrency extraAmortization)
+      }
+    , { header = monthlyRecordHeading labels.loanAmount
+      , width = fill
+      , view = monthlyRecordCell (\{ remainingLoan } -> text [ alignRight ] <| formatCurrency remainingLoan)
+      }
+    ]
+
+
+monthlyRecordHeading s =
+    el [ padding (space // 3) ] (heading 4 s)
+
+
+monthlyRecordCell viewField record =
+    el
+        [ padding (space // 3)
+        , alignRight
+        , Background.color <|
+            if (record.month |> modBy 12) == 0 then
+                rgb 1 0.980392 0.870588
+
+            else if (record.month |> modBy 2) == 0 then
+                rgb 0.980392 0.976471 1
+
+            else
+                rgb 1 1 1
+        ]
+        (viewField record)
+
+
+text : List (Attribute msg) -> String -> Element msg
+text attrs txt =
+    el ([ Font.size theme.fontSize ] ++ attrs) (Element.text txt)
 
 
 smallText : String -> Element msg
 smallText txt =
-    el [ Font.size (theme.fontSize * 0.75 |> round) ] (Element.text txt)
+    text [ Font.size (theme.fontSize * 0.75 |> round) ] txt
 
 
 bigText : String -> Element msg
 bigText txt =
-    el [ Font.size (theme.fontSize * 1.5 |> round) ] (Element.text txt)
+    text [ Font.size (theme.fontSize * 1.5 |> round) ] txt
 
 
 heading : Int -> String -> Element Msg
@@ -541,18 +781,23 @@ button : msg -> String -> Element msg
 button msg txt =
     Input.button [ Font.underline, Font.color theme.colors.activeText ]
         { onPress = Just msg
-        , label = text txt
+        , label = text [] txt
         }
 
 
 label : String -> Element msg
 label txt =
-    el [ Font.color theme.colors.lightText ] (text txt)
+    text [ Font.color theme.colors.lightText ] txt
 
 
 smallLabel : String -> Element msg
 smallLabel txt =
-    el [ Font.color theme.colors.lightText ] (smallText txt)
+    text [ Font.color theme.colors.lightText, Font.size (theme.fontSize * 0.75 |> round) ] txt
+
+
+tinyLabel : String -> Element msg
+tinyLabel txt =
+    text [ Font.color theme.colors.lightText, Font.size (theme.fontSize * 0.5 |> round) ] txt
 
 
 theme =
@@ -568,8 +813,13 @@ numberLocale locale =
     { locale | decimals = 2 }
 
 
+yearLocale locale =
+    { locale | decimals = 1 }
+
+
 labels =
     { numberLocale = numberLocale spanishLocale
+    , yearLocale = yearLocale spanishLocale
     , pageTitle = "Calculadora de hipotecas"
     , newReport = "Nuevo caso de hipoteca"
     , home = "Inicio"
@@ -581,6 +831,7 @@ labels =
     , extraExpenses = "Gastos hipoteca"
     , loanAmount = "Cantidad de prestamo"
     , years = "Años"
+    , year = "Año"
     , selectAmortization = "Selecciona estrategia de amortizacion"
     , amortizeEveryYear = "Amortizar cada año"
     , bankName = "Nombre del banco"
@@ -589,6 +840,18 @@ labels =
     , editCurrentMortgage = "Editar hipoteca elegida"
     , editAmortization = "Cambiar amortizacion"
     , save = "Guardar"
+    , reportResults = "Resultados"
+    , nYears = \nYears -> formatYears nYears ++ " years"
+    , payedIn = "Pagado en"
+    , totalExpensesAndInterests = "Total gastos + intereses"
+    , monthlyPaymentFirstYear = "Cuota mensual 1er año"
+    , monthlyPaymentRest = "Cuota mensual resto"
+    , month = "Mes"
+    , payment = "Cuota"
+    , interest = "Interes"
+    , amortized = "Amortizado"
+    , extraAmortization = "Amort. extra"
+    , saveReport = "Guardar resultados"
     }
 
 
