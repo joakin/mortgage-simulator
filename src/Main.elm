@@ -385,6 +385,31 @@ floatFromString str =
         |> Maybe.withDefault 0.0
 
 
+compareReports : Report -> Report -> Order
+compareReports a b =
+    case compare a.mortgage.amount b.mortgage.amount of
+        EQ ->
+            case compare a.mortgage.years b.mortgage.years of
+                EQ ->
+                    case compare a.amortization.yearly b.amortization.yearly of
+                        EQ ->
+                            case compare a.mortgage.bank b.mortgage.bank of
+                                EQ ->
+                                    EQ
+
+                                other ->
+                                    other
+
+                        other ->
+                            other
+
+                other ->
+                    other
+
+        other ->
+            other
+
+
 caixa : Mortgage
 caixa =
     { bank = "Caixa"
@@ -566,7 +591,9 @@ update msg ({ page } as model) =
                                         model.reports
 
                                     else
-                                        report :: model.reports
+                                        report
+                                            :: model.reports
+                                            |> List.sortWith compareReports
                                 , mortgages =
                                     -- Don't add mortgage if there is another
                                     -- one like it
@@ -599,7 +626,10 @@ update msg ({ page } as model) =
         SessionLoaded sessionStr ->
             ( case decodeSession sessionStr of
                 Just { reports, mortgages } ->
-                    { model | reports = reports, mortgages = mortgages }
+                    { model
+                        | reports = reports |> List.sortWith compareReports
+                        , mortgages = mortgages
+                    }
 
                 Nothing ->
                     model
@@ -656,9 +686,9 @@ body model =
     layout []
         (column
             [ centerX
-            , padding space
+            , padding (space * 2)
             , spacing space
-            , width (fill |> maximum 800)
+            , width fill
             ]
             [ menu model.page
             , viewPage model
@@ -696,65 +726,75 @@ viewPage { reports, mortgages, page } =
 
 viewHome : List Report -> Element Msg
 viewHome reports =
-    column [ padding space, spacing space ]
+    column [ width fill, padding space, spacing space ]
         [ viewReports reports ]
 
 
+paddingBottom b =
+    paddingEach { top = 0, left = 0, right = 0, bottom = b }
+
+
 viewReports reports =
-    table []
-        { data = reports
-        , columns =
-            [ { header = reportHeading ""
-              , width = fill
-              , view = reportCell (\r -> button [] (OpenReportDetail r) <| smallText [] labels.viewDetail)
-              }
-            , { header = reportHeading labels.bank
-              , width = fill
-              , view = reportCell (\r -> smallText [] r.mortgage.bank)
-              }
-            , { header = reportHeading labels.amount
-              , width = fill
-              , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.mortgage.amount)
-              }
-            , { header = reportHeading labels.years
-              , width = fill
-              , view = reportCell (\r -> smallText [ alignRight ] <| formatNumber r.mortgage.years)
-              }
-            , { header = reportHeading labels.rateFirstAndRest
-              , width = fill
-              , view = reportCell (\r -> smallText [ alignRight ] <| formatNumber r.mortgage.rate.first ++ " / " ++ formatNumber r.mortgage.rate.rest)
-              }
-            , { header = reportHeading labels.extraExpenses
-              , width = fill
-              , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.mortgage.extraExpenses)
-              }
-            , { header = reportHeading labels.amortizeEveryYear
-              , width = fill
-              , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.amortization.yearly)
-              }
-            , { header = reportHeading labels.totalExpensesAndInterests
-              , width = fill
-              , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.results.totalExpensesAndInterests)
-              }
-            , { header = reportHeading labels.payedIn
-              , width = fill
-              , view = reportCell (\r -> smallText [ alignRight ] <| labels.nYears r.results.finishesPayingIn)
-              }
-            , { header = reportHeading labels.monthlyPaymentFirstYear
-              , width = fill
-              , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.results.monthlyPayment.first)
-              }
-            , { header = reportHeading labels.monthlyPaymentRest
-              , width = fill
-              , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.results.monthlyPayment.rest)
-              }
-            ]
-        }
+    case reports of
+        [] ->
+            label [ centerX ] labels.noReportsSaved
+
+        _ ->
+            el [ paddingBottom space, width fill, clipX, scrollbarX, htmlAttribute (HA.style "overflow-y" "hidden") ] <|
+                table []
+                    { data = reports
+                    , columns =
+                        [ { header = reportHeading ""
+                          , width = fill
+                          , view = reportCell (\r -> button [] (OpenReportDetail r) <| smallText [] labels.viewDetail)
+                          }
+                        , { header = reportHeading labels.bank
+                          , width = fill
+                          , view = reportCell (\r -> smallText [] r.mortgage.bank)
+                          }
+                        , { header = reportHeading labels.amount
+                          , width = fill
+                          , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.mortgage.amount)
+                          }
+                        , { header = reportHeading labels.years
+                          , width = fill
+                          , view = reportCell (\r -> smallText [ alignRight ] <| formatNumber r.mortgage.years)
+                          }
+                        , { header = reportHeading labels.rateFirstAndRest
+                          , width = fill
+                          , view = reportCell (\r -> smallText [ alignRight ] <| formatNumber r.mortgage.rate.first ++ " / " ++ formatNumber r.mortgage.rate.rest)
+                          }
+                        , { header = reportHeading labels.extraExpenses
+                          , width = fill
+                          , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.mortgage.extraExpenses)
+                          }
+                        , { header = reportHeading labels.amortizeEveryYear
+                          , width = fill
+                          , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.amortization.yearly)
+                          }
+                        , { header = reportHeading labels.totalExpensesAndInterests
+                          , width = fill
+                          , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.results.totalExpensesAndInterests)
+                          }
+                        , { header = reportHeading labels.payedIn
+                          , width = fill
+                          , view = reportCell (\r -> smallText [ alignRight ] <| labels.nYears r.results.finishesPayingIn)
+                          }
+                        , { header = reportHeading labels.monthlyPaymentFirstYear
+                          , width = fill
+                          , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.results.monthlyPayment.first)
+                          }
+                        , { header = reportHeading labels.monthlyPaymentRest
+                          , width = fill
+                          , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.results.monthlyPayment.rest)
+                          }
+                        ]
+                    }
 
 
 reportHeading : String -> Element Msg
 reportHeading s =
-    el [ padding (space // 3) ] (smallLabel [] s)
+    tinyText [ padding (space // 3), Font.bold ] s
 
 
 reportCell : (Report -> Element Msg) -> Report -> Element Msg
@@ -763,7 +803,7 @@ reportCell viewField record =
 
 
 viewReportSummary report =
-    row [ width fill, spaceEvenly, spacing space ]
+    row [ centerX, spaceEvenly, spacing space ]
         [ viewMortgageShortSummary report.mortgage
         , viewAmortizationShortSummary report.amortization
         , viewReportResultsShortSummary report.results
@@ -788,7 +828,7 @@ viewReportResultsShortSummary results =
 viewReport : Report -> Element Msg
 viewReport report =
     column [ width fill, padding space, spacing space ]
-        [ row [ width fill, spacing space ]
+        [ row [ centerX, spacing space ]
             [ viewMortgage report.mortgage
             , el [ alignTop ] (viewAmortization report.amortization)
             ]
@@ -798,7 +838,7 @@ viewReport report =
 
 viewReportInProgress : List Mortgage -> ReportInProgress -> Element Msg
 viewReportInProgress savedMortgages { mortgage, amortization } =
-    column [ width fill, padding space, spacing (space * 2) ]
+    column [ centerX, padding space, spacing (space * 2) ]
         [ viewMortgageForm savedMortgages mortgage
         , viewAmortizationForm amortization
         , case ( mortgage, amortization ) of
@@ -817,7 +857,7 @@ viewReportResultsInProgress m a =
             calculateReportResults m a
     in
     column [ width fill, spacing space ]
-        [ heading [] 2 labels.reportResults
+        [ heading [ centerX ] 2 labels.reportResults
         , button [ alignRight ] (SaveReport results) <| text [] labels.saveReport
         , viewReportResults results
         , button [ alignRight ] (SaveReport results) <| text [] labels.saveReport
@@ -826,7 +866,7 @@ viewReportResultsInProgress m a =
 
 viewMortgageSelector : List Mortgage -> Element Msg
 viewMortgageSelector savedMortgages =
-    row [ width fill, spacing space, spaceEvenly ]
+    row [ centerX, spacing space ]
         [ Input.radio [ spacing space ]
             { onChange = SelectMortgage
             , selected = Nothing
@@ -895,7 +935,7 @@ viewMortgageForm savedMortgages mortgageInProgress =
                         , text = txt
                         }
             in
-            row [ width fill, spacing space ]
+            row [ centerX, spacing space ]
                 [ column [ height fill, width (fillPortion 1), spacing space ]
                     [ input labels.bankName (\bank -> { mortgage | bank = bank }) mortgage.bank
                     , button [ alignBottom ] ResetMortgage <| text [] labels.back
@@ -913,9 +953,9 @@ viewMortgageForm savedMortgages mortgageInProgress =
                 ]
 
         MortgageChosen mortgage ->
-            row [ width fill, spaceEvenly, spacing space ]
+            row [ centerX, spacing space ]
                 [ viewMortgage mortgage
-                , column [ spacing space ]
+                , column [ spacing space, alignTop ]
                     [ button [ alignBottom ] (EditMortgage mortgage) <| text [] labels.editCurrentMortgage
                     , button [ alignBottom ] ResetMortgage <| text [] labels.changeMortgage
                     ]
@@ -924,7 +964,7 @@ viewMortgageForm savedMortgages mortgageInProgress =
 
 viewMortgage : Mortgage -> Element Msg
 viewMortgage mortgage =
-    row [ width fill, spacing space, spaceEvenly ]
+    row [ centerX, spacing space ]
         [ column [ height fill, spacing space ]
             [ heading [] 2 mortgage.bank ]
         , column [ spacing (space // 2), alignTop ]
@@ -941,11 +981,11 @@ viewMortgage mortgage =
 
 viewAmortizationForm : AmortizationInProgress -> Element Msg
 viewAmortizationForm amortizationInProgress =
-    column [ spacing space, width fill ]
+    column [ centerX, spacing space ]
         [ heading [] 2 labels.selectAmortization
         , case amortizationInProgress of
             AmortizationEditing amortization ->
-                row [ spacing space, width fill ]
+                row [ spacing space, centerX ]
                     [ Input.text [ spacing space ]
                         { label = Input.labelLeft [ centerY ] (label [] labels.amortizeEveryYear)
                         , onChange = UpdateEditingAmortization << (\yearly -> { amortization | yearly = yearly })
@@ -957,7 +997,7 @@ viewAmortizationForm amortizationInProgress =
                     ]
 
             AmortizationChosen amortization ->
-                row [ spacing space, width fill ]
+                row [ centerX, spacing space ]
                     [ viewAmortization amortization
                     , button [ alignRight ] (UpdateEditingAmortization (amortizationToEditableAmortization amortization)) <|
                         text [] labels.editAmortization
@@ -974,7 +1014,7 @@ viewAmortization amortization =
 viewReportResults : ReportResults -> Element Msg
 viewReportResults results =
     column [ width fill, spacing space ]
-        [ row [ width fill, spacing space, spaceEvenly ]
+        [ row [ centerX, spacing space ]
             [ viewStackedKeyValue labels.totalExpensesAndInterests (bigText [] <| formatCurrency results.totalExpensesAndInterests)
             , viewStackedKeyValue labels.payedIn (bigText [] <| labels.nYears results.finishesPayingIn)
             , column [ spacing (space // 2) ]
@@ -986,7 +1026,7 @@ viewReportResults results =
         -- Hide the vertical scrollbar that shows up for some reason even if
         -- it is tall enough ...
         , el [ width fill, clipX, scrollbarX, htmlAttribute (HA.style "overflow-y" "hidden") ] <|
-            table []
+            table [ centerX ]
                 { data = results.records |> Array.toList
                 , columns = monthlyRecordColumns
                 }
@@ -1047,6 +1087,11 @@ monthlyRecordCell viewField record =
         (viewField record)
 
 
+tinyText : List (Attribute msg) -> String -> Element msg
+tinyText attrs txt =
+    text ([ Font.size (theme.fontSize * 0.5 |> round) ] ++ attrs) txt
+
+
 text : List (Attribute msg) -> String -> Element msg
 text attrs txt =
     el ([ Font.size theme.fontSize ] ++ attrs) (Element.text txt)
@@ -1077,17 +1122,17 @@ button attrs msg txt =
 
 label : List (Attribute msg) -> String -> Element msg
 label attrs txt =
-    text [ Font.color theme.colors.lightText ] txt
+    text ([ Font.color theme.colors.lightText ] ++ attrs) txt
 
 
 smallLabel : List (Attribute msg) -> String -> Element msg
 smallLabel attrs txt =
-    text [ Font.color theme.colors.lightText, Font.size (theme.fontSize * 0.75 |> round) ] txt
+    text ([ Font.color theme.colors.lightText, Font.size (theme.fontSize * 0.75 |> round) ] ++ attrs) txt
 
 
 tinyLabel : List (Attribute msg) -> String -> Element msg
 tinyLabel attrs txt =
-    text [ Font.color theme.colors.lightText, Font.size (theme.fontSize * 0.5 |> round) ] txt
+    text ([ Font.color theme.colors.lightText, Font.size (theme.fontSize * 0.5 |> round) ] ++ attrs) txt
 
 
 theme =
@@ -1130,7 +1175,7 @@ labels =
     , bankName = "Nombre del banco"
     , back = "Volver atrás"
     , saveMortgage = "Guardar hipoteca"
-    , editCurrentMortgage = "Editar hipoteca elegida"
+    , editCurrentMortgage = "Editar hipoteca"
     , editAmortization = "Cambiar amortizacion"
     , save = "Guardar"
     , reportResults = "Resultados"
@@ -1148,6 +1193,7 @@ labels =
     , downloadSession = "Guardar sesión"
     , loadSession = "Cargar sesión"
     , viewDetail = "Ver detalle"
+    , noReportsSaved = "No hay casos guardados"
     }
 
 
