@@ -299,11 +299,17 @@ type Page
 
 init : Flags -> ( Model, Cmd Msg )
 init () =
-    { mortgages = [ caixa ]
-    , reports = []
-    , page = Home
-    }
-        |> update NavigateToNewReport
+    ( { mortgages = []
+      , reports = []
+      , page = Home
+      }
+    , Cmd.none
+    )
+
+
+
+-- |> Tuple.first
+-- |> update NavigateToNewReport
 
 
 type Msg
@@ -425,10 +431,30 @@ update msg ({ page } as model) =
                 AddNewReport r ->
                     case ( r.mortgage, r.amortization ) of
                         ( MortgageChosen m, AmortizationChosen a ) ->
+                            let
+                                report =
+                                    { amortization = a, mortgage = m, results = results }
+                            in
                             ( { model
                                 | page = Home
-                                , reports = { amortization = a, mortgage = m, results = results } :: model.reports
-                                , mortgages = m :: model.mortgages
+                                , reports =
+                                    -- Don't add reports if there is another one
+                                    -- like it. Don't compare report results
+                                    -- since they are derived from the other two
+                                    -- parameters.
+                                    if List.any (\r_ -> a == r_.amortization && m == r_.mortgage) model.reports then
+                                        model.reports
+
+                                    else
+                                        report :: model.reports
+                                , mortgages =
+                                    -- Don't add mortgage if there is another
+                                    -- one like it
+                                    if List.any ((==) m) model.mortgages then
+                                        model.mortgages
+
+                                    else
+                                        m :: model.mortgages
                               }
                             , Cmd.none
                             )
