@@ -706,7 +706,7 @@ viewReports reports =
         , columns =
             [ { header = reportHeading ""
               , width = fill
-              , view = reportCell (\r -> button [] (OpenReportDetail r) <| text [] labels.viewDetail)
+              , view = reportCell (\r -> button [] (OpenReportDetail r) <| smallText [] labels.viewDetail)
               }
             , { header = reportHeading labels.bank
               , width = fill
@@ -714,39 +714,39 @@ viewReports reports =
               }
             , { header = reportHeading labels.amount
               , width = fill
-              , view = reportCell (\r -> smallText [] <| formatCurrency r.mortgage.amount)
+              , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.mortgage.amount)
               }
             , { header = reportHeading labels.years
               , width = fill
-              , view = reportCell (\r -> smallText [] <| formatNumber r.mortgage.years)
+              , view = reportCell (\r -> smallText [ alignRight ] <| formatNumber r.mortgage.years)
               }
             , { header = reportHeading labels.rateFirstAndRest
               , width = fill
-              , view = reportCell (\r -> smallText [] <| formatNumber r.mortgage.rate.first ++ " / " ++ formatNumber r.mortgage.rate.rest)
+              , view = reportCell (\r -> smallText [ alignRight ] <| formatNumber r.mortgage.rate.first ++ " / " ++ formatNumber r.mortgage.rate.rest)
               }
             , { header = reportHeading labels.extraExpenses
               , width = fill
-              , view = reportCell (\r -> smallText [] <| formatCurrency r.mortgage.extraExpenses)
+              , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.mortgage.extraExpenses)
               }
             , { header = reportHeading labels.amortizeEveryYear
               , width = fill
-              , view = reportCell (\r -> smallText [] <| formatCurrency r.amortization.yearly)
+              , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.amortization.yearly)
               }
             , { header = reportHeading labels.totalExpensesAndInterests
               , width = fill
-              , view = reportCell (\r -> smallText [] <| formatCurrency r.results.totalExpensesAndInterests)
+              , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.results.totalExpensesAndInterests)
               }
             , { header = reportHeading labels.payedIn
               , width = fill
-              , view = reportCell (\r -> smallText [] <| labels.nYears r.results.finishesPayingIn)
+              , view = reportCell (\r -> smallText [ alignRight ] <| labels.nYears r.results.finishesPayingIn)
               }
             , { header = reportHeading labels.monthlyPaymentFirstYear
               , width = fill
-              , view = reportCell (\r -> smallText [] <| formatCurrency r.results.monthlyPayment.first)
+              , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.results.monthlyPayment.first)
               }
             , { header = reportHeading labels.monthlyPaymentRest
               , width = fill
-              , view = reportCell (\r -> smallText [] <| formatCurrency r.results.monthlyPayment.rest)
+              , view = reportCell (\r -> smallText [ alignRight ] <| formatCurrency r.results.monthlyPayment.rest)
               }
             ]
         }
