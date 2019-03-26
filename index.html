@@ -5851,7 +5851,11 @@ var mdgriffith$elm_ui$Element$rgb = F3(
 var author$project$Main$theme = {
 	colors: {
 		activeText: A3(mdgriffith$elm_ui$Element$rgb, 0, 0.3, 0.8),
-		lightText: A3(mdgriffith$elm_ui$Element$rgb, 0.8, 0.8, 0.8)
+		evenRowBackground: A3(mdgriffith$elm_ui$Element$rgb, 0.980392, 0.976471, 1),
+		highlightedRowBackground: A3(mdgriffith$elm_ui$Element$rgb, 1, 0.980392, 0.870588),
+		lightText: A3(mdgriffith$elm_ui$Element$rgb, 0.8, 0.8, 0.8),
+		oddRowBackground: A3(mdgriffith$elm_ui$Element$rgb, 1, 1, 1),
+		tableHeadingBorder: A3(mdgriffith$elm_ui$Element$rgb, 0.917647, 0.917647, 0.917647)
 	},
 	fontSize: 20
 };
@@ -11793,7 +11797,7 @@ function author$project$Main$cyclic$labels() {
 		monthlyPaymentFirstYear: 'Cuota mensual 1er año',
 		monthlyPaymentRest: 'Cuota mensual resto',
 		nYears: function (nYears) {
-			return author$project$Main$formatYears(nYears) + ' years';
+			return author$project$Main$formatYears(nYears) + ' años';
 		},
 		newMortgage: 'Nueva hipoteca',
 		newReport: 'Nuevo caso de hipoteca',
@@ -11812,7 +11816,7 @@ function author$project$Main$cyclic$labels() {
 		selectAMortgage: 'Selecciona una hipoteca',
 		selectAmortization: 'Selecciona estrategia de amortizacion',
 		totalExpensesAndInterests: 'Total gastos + intereses',
-		viewDetail: 'Ver detalle',
+		view: 'Ver',
 		year: 'Año',
 		yearLocale: author$project$Main$yearLocale(cuducos$elm_format_number$FormatNumber$Locales$spanishLocale),
 		years: 'Años'
@@ -12022,6 +12026,22 @@ var author$project$Main$paddingBottom = function (b) {
 	return mdgriffith$elm_ui$Element$paddingEach(
 		{bottom: b, left: 0, right: 0, top: 0});
 };
+var elm$core$Basics$modBy = _Basics_modBy;
+var mdgriffith$elm_ui$Internal$Flag$bgColor = mdgriffith$elm_ui$Internal$Flag$flag(8);
+var mdgriffith$elm_ui$Element$Background$color = function (clr) {
+	return A2(
+		mdgriffith$elm_ui$Internal$Model$StyleClass,
+		mdgriffith$elm_ui$Internal$Flag$bgColor,
+		A3(
+			mdgriffith$elm_ui$Internal$Model$Colored,
+			'bg-' + mdgriffith$elm_ui$Internal$Model$formatColorClass(clr),
+			'background-color',
+			clr));
+};
+var author$project$Main$evenOddBackground = function (n) {
+	return mdgriffith$elm_ui$Element$Background$color(
+		(!A2(elm$core$Basics$modBy, 2, n)) ? author$project$Main$theme.colors.evenRowBackground : author$project$Main$theme.colors.oddRowBackground);
+};
 var mdgriffith$elm_ui$Element$padding = function (x) {
 	return A2(
 		mdgriffith$elm_ui$Internal$Model$StyleClass,
@@ -12034,16 +12054,79 @@ var mdgriffith$elm_ui$Element$padding = function (x) {
 			x,
 			x));
 };
-var author$project$Main$reportCell = F2(
-	function (viewField, record) {
+var author$project$Main$reportCell = F3(
+	function (viewField, i, record) {
 		return A2(
 			mdgriffith$elm_ui$Element$el,
 			_List_fromArray(
 				[
-					mdgriffith$elm_ui$Element$padding((author$project$Main$space / 3) | 0)
+					mdgriffith$elm_ui$Element$padding((author$project$Main$space / 3) | 0),
+					author$project$Main$evenOddBackground(i + 1)
 				]),
 			viewField(record));
 	});
+var mdgriffith$elm_ui$Internal$Flag$borderColor = mdgriffith$elm_ui$Internal$Flag$flag(28);
+var mdgriffith$elm_ui$Element$Border$color = function (clr) {
+	return A2(
+		mdgriffith$elm_ui$Internal$Model$StyleClass,
+		mdgriffith$elm_ui$Internal$Flag$borderColor,
+		A3(
+			mdgriffith$elm_ui$Internal$Model$Colored,
+			'bc-' + mdgriffith$elm_ui$Internal$Model$formatColorClass(clr),
+			'border-color',
+			clr));
+};
+var mdgriffith$elm_ui$Internal$Model$BorderWidth = F5(
+	function (a, b, c, d, e) {
+		return {$: 'BorderWidth', a: a, b: b, c: c, d: d, e: e};
+	});
+var mdgriffith$elm_ui$Element$Border$width = function (v) {
+	return A2(
+		mdgriffith$elm_ui$Internal$Model$StyleClass,
+		mdgriffith$elm_ui$Internal$Flag$borderWidth,
+		A5(
+			mdgriffith$elm_ui$Internal$Model$BorderWidth,
+			'b-' + elm$core$String$fromInt(v),
+			v,
+			v,
+			v,
+			v));
+};
+var mdgriffith$elm_ui$Element$Border$widthXY = F2(
+	function (x, y) {
+		return A2(
+			mdgriffith$elm_ui$Internal$Model$StyleClass,
+			mdgriffith$elm_ui$Internal$Flag$borderWidth,
+			A5(
+				mdgriffith$elm_ui$Internal$Model$BorderWidth,
+				'b-' + (elm$core$String$fromInt(x) + ('-' + elm$core$String$fromInt(y))),
+				y,
+				x,
+				y,
+				x));
+	});
+var mdgriffith$elm_ui$Element$Border$widthEach = function (_n0) {
+	var bottom = _n0.bottom;
+	var top = _n0.top;
+	var left = _n0.left;
+	var right = _n0.right;
+	return (_Utils_eq(top, bottom) && _Utils_eq(left, right)) ? (_Utils_eq(top, right) ? mdgriffith$elm_ui$Element$Border$width(top) : A2(mdgriffith$elm_ui$Element$Border$widthXY, left, top)) : A2(
+		mdgriffith$elm_ui$Internal$Model$StyleClass,
+		mdgriffith$elm_ui$Internal$Flag$borderWidth,
+		A5(
+			mdgriffith$elm_ui$Internal$Model$BorderWidth,
+			'b-' + (elm$core$String$fromInt(top) + ('-' + (elm$core$String$fromInt(right) + ('-' + (elm$core$String$fromInt(bottom) + ('-' + elm$core$String$fromInt(left))))))),
+			top,
+			right,
+			bottom,
+			left));
+};
+var author$project$Main$tableHeadingBorder = _List_fromArray(
+	[
+		mdgriffith$elm_ui$Element$Border$color(author$project$Main$theme.colors.tableHeadingBorder),
+		mdgriffith$elm_ui$Element$Border$widthEach(
+		{bottom: 2, left: 0, right: 0, top: 0})
+	]);
 var author$project$Main$tinyText = F2(
 	function (attrs, txt) {
 		return A2(
@@ -12057,14 +12140,19 @@ var author$project$Main$tinyText = F2(
 				attrs),
 			txt);
 	});
+var mdgriffith$elm_ui$Internal$Flag$fontAlignment = mdgriffith$elm_ui$Internal$Flag$flag(12);
+var mdgriffith$elm_ui$Element$Font$center = A2(mdgriffith$elm_ui$Internal$Model$Class, mdgriffith$elm_ui$Internal$Flag$fontAlignment, mdgriffith$elm_ui$Internal$Style$classes.textCenter);
 var author$project$Main$reportHeading = function (s) {
 	return A2(
 		author$project$Main$tinyText,
-		_List_fromArray(
-			[
-				mdgriffith$elm_ui$Element$padding((author$project$Main$space / 3) | 0),
-				mdgriffith$elm_ui$Element$Font$bold
-			]),
+		_Utils_ap(
+			_List_fromArray(
+				[
+					mdgriffith$elm_ui$Element$padding((author$project$Main$space / 3) | 0),
+					mdgriffith$elm_ui$Element$Font$bold,
+					mdgriffith$elm_ui$Element$Font$center
+				]),
+			author$project$Main$tableHeadingBorder),
 		s);
 };
 var author$project$Main$smallText = F2(
@@ -12091,9 +12179,8 @@ var mdgriffith$elm_ui$Internal$Model$Fill = function (a) {
 };
 var mdgriffith$elm_ui$Element$fill = mdgriffith$elm_ui$Internal$Model$Fill(1);
 var mdgriffith$elm_ui$Element$htmlAttribute = mdgriffith$elm_ui$Internal$Model$Attr;
-var mdgriffith$elm_ui$Element$scrollbarX = A2(mdgriffith$elm_ui$Internal$Model$Class, mdgriffith$elm_ui$Internal$Flag$overflow, mdgriffith$elm_ui$Internal$Style$classes.scrollbarsX);
-var mdgriffith$elm_ui$Element$InternalColumn = function (a) {
-	return {$: 'InternalColumn', a: a};
+var mdgriffith$elm_ui$Element$InternalIndexedColumn = function (a) {
+	return {$: 'InternalIndexedColumn', a: a};
 };
 var elm$core$List$all = F2(
 	function (isOkay, list) {
@@ -12311,16 +12398,17 @@ var mdgriffith$elm_ui$Element$tableHelper = F2(
 					}
 				}()));
 	});
-var mdgriffith$elm_ui$Element$table = F2(
+var mdgriffith$elm_ui$Element$indexedTable = F2(
 	function (attrs, config) {
 		return A2(
 			mdgriffith$elm_ui$Element$tableHelper,
 			attrs,
 			{
-				columns: A2(elm$core$List$map, mdgriffith$elm_ui$Element$InternalColumn, config.columns),
+				columns: A2(elm$core$List$map, mdgriffith$elm_ui$Element$InternalIndexedColumn, config.columns),
 				data: config.data
 			});
 	});
+var mdgriffith$elm_ui$Element$scrollbarX = A2(mdgriffith$elm_ui$Internal$Model$Class, mdgriffith$elm_ui$Internal$Flag$overflow, mdgriffith$elm_ui$Internal$Style$classes.scrollbarsX);
 var author$project$Main$viewReports = function (reports) {
 	if (!reports.b) {
 		return A2(
@@ -12341,20 +12429,20 @@ var author$project$Main$viewReports = function (reports) {
 					A2(elm$html$Html$Attributes$style, 'overflow-y', 'hidden'))
 				]),
 			A2(
-				mdgriffith$elm_ui$Element$table,
+				mdgriffith$elm_ui$Element$indexedTable,
 				_List_Nil,
 				{
 					columns: _List_fromArray(
 						[
 							{
-							header: author$project$Main$reportHeading(''),
+							header: author$project$Main$reportHeading(' '),
 							view: author$project$Main$reportCell(
 								function (r) {
 									return A3(
 										author$project$Main$button,
 										_List_Nil,
 										author$project$Main$OpenReportDetail(r),
-										A2(author$project$Main$smallText, _List_Nil, author$project$Main$labels.viewDetail));
+										A2(author$project$Main$smallText, _List_Nil, author$project$Main$labels.view));
 								}),
 							width: mdgriffith$elm_ui$Element$fill
 						},
@@ -12646,18 +12734,6 @@ var author$project$Main$viewMortgage = function (mortgage) {
 					]))
 			]));
 };
-var elm$core$Basics$modBy = _Basics_modBy;
-var mdgriffith$elm_ui$Internal$Flag$bgColor = mdgriffith$elm_ui$Internal$Flag$flag(8);
-var mdgriffith$elm_ui$Element$Background$color = function (clr) {
-	return A2(
-		mdgriffith$elm_ui$Internal$Model$StyleClass,
-		mdgriffith$elm_ui$Internal$Flag$bgColor,
-		A3(
-			mdgriffith$elm_ui$Internal$Model$Colored,
-			'bg-' + mdgriffith$elm_ui$Internal$Model$formatColorClass(clr),
-			'background-color',
-			clr));
-};
 var author$project$Main$monthlyRecordCell = F2(
 	function (viewField, record) {
 		return A2(
@@ -12666,18 +12742,20 @@ var author$project$Main$monthlyRecordCell = F2(
 				[
 					mdgriffith$elm_ui$Element$padding((author$project$Main$space / 3) | 0),
 					mdgriffith$elm_ui$Element$alignRight,
-					mdgriffith$elm_ui$Element$Background$color(
-					(!A2(elm$core$Basics$modBy, 12, record.month)) ? A3(mdgriffith$elm_ui$Element$rgb, 1, 0.980392, 0.870588) : ((!A2(elm$core$Basics$modBy, 2, record.month)) ? A3(mdgriffith$elm_ui$Element$rgb, 0.980392, 0.976471, 1) : A3(mdgriffith$elm_ui$Element$rgb, 1, 1, 1)))
+					(!A2(elm$core$Basics$modBy, 12, record.month)) ? mdgriffith$elm_ui$Element$Background$color(author$project$Main$theme.colors.highlightedRowBackground) : author$project$Main$evenOddBackground(record.month)
 				]),
 			viewField(record));
 	});
 var author$project$Main$monthlyRecordHeading = function (s) {
 	return A3(
 		author$project$Main$heading,
-		_List_fromArray(
-			[
-				mdgriffith$elm_ui$Element$padding((author$project$Main$space / 3) | 0)
-			]),
+		_Utils_ap(
+			_List_fromArray(
+				[
+					mdgriffith$elm_ui$Element$padding((author$project$Main$space / 3) | 0),
+					mdgriffith$elm_ui$Element$Font$center
+				]),
+			author$project$Main$tableHeadingBorder),
 		4,
 		s);
 };
@@ -12694,7 +12772,7 @@ var author$project$Main$monthlyRecordColumns = _List_fromArray(
 						[mdgriffith$elm_ui$Element$alignRight]),
 					elm$core$String$fromInt(year));
 			}),
-		width: mdgriffith$elm_ui$Element$fill
+		width: mdgriffith$elm_ui$Element$shrink
 	},
 		{
 		header: author$project$Main$monthlyRecordHeading(author$project$Main$labels.month),
@@ -12707,7 +12785,7 @@ var author$project$Main$monthlyRecordColumns = _List_fromArray(
 						[mdgriffith$elm_ui$Element$alignRight]),
 					elm$core$String$fromInt(month));
 			}),
-		width: mdgriffith$elm_ui$Element$fill
+		width: mdgriffith$elm_ui$Element$shrink
 	},
 		{
 		header: author$project$Main$monthlyRecordHeading(author$project$Main$labels.payment),
@@ -12775,6 +12853,19 @@ var author$project$Main$monthlyRecordColumns = _List_fromArray(
 		width: mdgriffith$elm_ui$Element$fill
 	}
 	]);
+var mdgriffith$elm_ui$Element$InternalColumn = function (a) {
+	return {$: 'InternalColumn', a: a};
+};
+var mdgriffith$elm_ui$Element$table = F2(
+	function (attrs, config) {
+		return A2(
+			mdgriffith$elm_ui$Element$tableHelper,
+			attrs,
+			{
+				columns: A2(elm$core$List$map, mdgriffith$elm_ui$Element$InternalColumn, config.columns),
+				data: config.data
+			});
+	});
 var author$project$Main$viewReportResults = function (results) {
 	return A2(
 		mdgriffith$elm_ui$Element$column,
@@ -12992,17 +13083,6 @@ var mdgriffith$elm_ui$Element$inFront = function (element) {
 	return A2(mdgriffith$elm_ui$Internal$Model$Nearby, mdgriffith$elm_ui$Internal$Model$InFront, element);
 };
 var mdgriffith$elm_ui$Element$rgba = mdgriffith$elm_ui$Internal$Model$Rgba;
-var mdgriffith$elm_ui$Internal$Flag$borderColor = mdgriffith$elm_ui$Internal$Flag$flag(28);
-var mdgriffith$elm_ui$Element$Border$color = function (clr) {
-	return A2(
-		mdgriffith$elm_ui$Internal$Model$StyleClass,
-		mdgriffith$elm_ui$Internal$Flag$borderColor,
-		A3(
-			mdgriffith$elm_ui$Internal$Model$Colored,
-			'bc-' + mdgriffith$elm_ui$Internal$Model$formatColorClass(clr),
-			'border-color',
-			clr));
-};
 var mdgriffith$elm_ui$Element$Input$Padding = F4(
 	function (a, b, c, d) {
 		return {$: 'Padding', a: a, b: b, c: c, d: d};
@@ -13087,22 +13167,6 @@ var mdgriffith$elm_ui$Element$Border$rounded = function (radius) {
 			'br-' + elm$core$String$fromInt(radius),
 			'border-radius',
 			elm$core$String$fromInt(radius) + 'px'));
-};
-var mdgriffith$elm_ui$Internal$Model$BorderWidth = F5(
-	function (a, b, c, d, e) {
-		return {$: 'BorderWidth', a: a, b: b, c: c, d: d, e: e};
-	});
-var mdgriffith$elm_ui$Element$Border$width = function (v) {
-	return A2(
-		mdgriffith$elm_ui$Internal$Model$StyleClass,
-		mdgriffith$elm_ui$Internal$Flag$borderWidth,
-		A5(
-			mdgriffith$elm_ui$Internal$Model$BorderWidth,
-			'b-' + elm$core$String$fromInt(v),
-			v,
-			v,
-			v,
-			v));
 };
 var mdgriffith$elm_ui$Element$Input$darkGrey = A3(mdgriffith$elm_ui$Element$rgb, 186 / 255, 189 / 255, 182 / 255);
 var mdgriffith$elm_ui$Element$paddingXY = F2(
