@@ -5,6 +5,7 @@ import Browser
 import Dict exposing (Dict)
 import Element exposing (..)
 import Element.Background as Background
+import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
 import Element.Lazy as Lazy
@@ -410,16 +411,6 @@ compareReports a b =
             other
 
 
-caixa : Mortgage
-caixa =
-    { bank = "Caixa"
-    , rate = { first = 0.9, rest = 0.9 }
-    , amount = 130000
-    , years = 15.0
-    , extraExpenses = 0
-    }
-
-
 type alias Flags =
     ()
 
@@ -741,12 +732,12 @@ viewReports reports =
 
         _ ->
             el [ paddingBottom space, width fill, clipX, scrollbarX, htmlAttribute (HA.style "overflow-y" "hidden") ] <|
-                table []
+                indexedTable []
                     { data = reports
                     , columns =
-                        [ { header = reportHeading ""
+                        [ { header = reportHeading " "
                           , width = fill
-                          , view = reportCell (\r -> button [] (OpenReportDetail r) <| smallText [] labels.viewDetail)
+                          , view = reportCell (\r -> button [] (OpenReportDetail r) <| smallText [] labels.view)
                           }
                         , { header = reportHeading labels.bank
                           , width = fill
@@ -794,12 +785,18 @@ viewReports reports =
 
 reportHeading : String -> Element Msg
 reportHeading s =
-    tinyText [ padding (space // 3), Font.bold ] s
+    tinyText
+        ([ padding (space // 3), Font.bold, Font.center ] ++ tableHeadingBorder)
+        s
 
 
-reportCell : (Report -> Element Msg) -> Report -> Element Msg
-reportCell viewField record =
-    el [ padding (space // 3) ] (viewField record)
+reportCell : (Report -> Element Msg) -> Int -> Report -> Element Msg
+reportCell viewField i record =
+    el
+        [ padding (space // 3)
+        , evenOddBackground (i + 1)
+        ]
+        (viewField record)
 
 
 viewReportSummary report =
@@ -1036,11 +1033,11 @@ viewReportResults results =
 monthlyRecordColumns : List (Column MonthlyRecord Msg)
 monthlyRecordColumns =
     [ { header = monthlyRecordHeading labels.year
-      , width = fill
+      , width = shrink
       , view = monthlyRecordCell (\{ year } -> text [ alignRight ] <| String.fromInt year)
       }
     , { header = monthlyRecordHeading labels.month
-      , width = fill
+      , width = shrink
       , view = monthlyRecordCell (\{ month } -> text [ alignRight ] <| String.fromInt month)
       }
     , { header = monthlyRecordHeading labels.payment
@@ -1067,22 +1064,18 @@ monthlyRecordColumns =
 
 
 monthlyRecordHeading s =
-    heading [ padding (space // 3) ] 4 s
+    heading ([ padding (space // 3), Font.center ] ++ tableHeadingBorder) 4 s
 
 
 monthlyRecordCell viewField record =
     el
         [ padding (space // 3)
         , alignRight
-        , Background.color <|
-            if (record.month |> modBy 12) == 0 then
-                rgb 1 0.980392 0.870588
+        , if (record.month |> modBy 12) == 0 then
+            Background.color theme.colors.highlightedRowBackground
 
-            else if (record.month |> modBy 2) == 0 then
-                rgb 0.980392 0.976471 1
-
-            else
-                rgb 1 1 1
+          else
+            evenOddBackground record.month
         ]
         (viewField record)
 
@@ -1135,11 +1128,32 @@ tinyLabel attrs txt =
     text ([ Font.color theme.colors.lightText, Font.size (theme.fontSize * 0.5 |> round) ] ++ attrs) txt
 
 
+evenOddBackground : Int -> Attribute msg
+evenOddBackground n =
+    Background.color <|
+        if (n |> modBy 2) == 0 then
+            theme.colors.evenRowBackground
+
+        else
+            theme.colors.oddRowBackground
+
+
+tableHeadingBorder : List (Attribute msg)
+tableHeadingBorder =
+    [ Border.color theme.colors.tableHeadingBorder
+    , Border.widthEach { bottom = 2, top = 0, left = 0, right = 0 }
+    ]
+
+
 theme =
     { fontSize = 20
     , colors =
         { lightText = rgb 0.8 0.8 0.8
         , activeText = rgb 0 0.3 0.8
+        , highlightedRowBackground = rgb 1 0.980392 0.870588
+        , oddRowBackground = rgb 1 1 1
+        , evenRowBackground = rgb 0.980392 0.976471 1
+        , tableHeadingBorder = rgb 0.917647 0.917647 0.917647
         }
     }
 
@@ -1179,7 +1193,7 @@ labels =
     , editAmortization = "Cambiar amortizacion"
     , save = "Guardar"
     , reportResults = "Resultados"
-    , nYears = \nYears -> formatYears nYears ++ " years"
+    , nYears = \nYears -> formatYears nYears ++ " años"
     , payedIn = "Pagado en"
     , totalExpensesAndInterests = "Total gastos + intereses"
     , monthlyPaymentFirstYear = "Cuota mensual 1er año"
@@ -1192,7 +1206,7 @@ labels =
     , saveReport = "Guardar caso en sesión"
     , downloadSession = "Guardar sesión"
     , loadSession = "Cargar sesión"
-    , viewDetail = "Ver detalle"
+    , view = "Ver"
     , noReportsSaved = "No hay casos guardados"
     }
 
