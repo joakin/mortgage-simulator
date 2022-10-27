@@ -2,7 +2,6 @@ module Main exposing (main)
 
 import Array exposing (Array)
 import Browser
-import Dict exposing (Dict)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
@@ -14,7 +13,6 @@ import File.Download as Download
 import File.Select as Select
 import FormatNumber exposing (format)
 import FormatNumber.Locales exposing (spanishLocale)
-import Html.Attributes as HA
 import Json.Decode as D
 import Json.Encode as E
 import Task
@@ -439,6 +437,7 @@ init () =
 
 
 
+-- Debugging setup 👇
 -- |> Tuple.first
 -- |> update NavigateToNewReport
 
@@ -688,7 +687,7 @@ body model =
 
 
 menu : Page -> Element Msg
-menu page =
+menu _ =
     row [ centerX, spacing space ]
         [ button [] NavigateToHome <| text [] labels.home
         , button [] NavigateToNewReport <| text [] labels.newReport
@@ -717,8 +716,8 @@ viewPage { reports, mortgages, page } =
 
 viewHome : List Report -> Element Msg
 viewHome reports =
-    column [ width fill, padding space, spacing space ]
-        [ viewReports reports ]
+    el [ width fill, padding space, spacing space ]
+        (viewReports reports)
 
 
 paddingBottom b =
@@ -731,7 +730,7 @@ viewReports reports =
             label [ centerX ] labels.noReportsSaved
 
         _ ->
-            el [ paddingBottom space, width fill, clipX, scrollbarX, htmlAttribute (HA.style "overflow-y" "hidden") ] <|
+            el [ paddingBottom space, width fill, clipX, scrollbarX ] <|
                 indexedTable []
                     { data = reports
                     , columns =
@@ -1019,11 +1018,8 @@ viewReportResults results =
                 , viewStackedKeyValue labels.monthlyPaymentRest (text [] <| formatCurrency results.monthlyPayment.rest)
                 ]
             ]
-
-        -- Hide the vertical scrollbar that shows up for some reason even if
-        -- it is tall enough ...
-        , el [ width fill, clipX, scrollbarX, htmlAttribute (HA.style "overflow-y" "hidden") ] <|
-            table [ centerX ]
+        , el [ width fill ] <|
+            table [ centerX, scrollbarX ]
                 { data = results.records |> Array.toList
                 , columns = monthlyRecordColumns
                 }
